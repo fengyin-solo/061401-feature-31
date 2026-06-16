@@ -38,3 +38,18 @@ export interface ActionEffect {
   wood?: number
   stone?: number
 }
+
+export type StatKey = 'health' | 'hunger' | 'thirst' | 'wood' | 'stone'
+
+export interface StatRisk {
+  key: StatKey
+  label: string
+  value: number
+  max: number
+  risk: number
+  icon: string
+  color: string
+  barColor: string
+  isReverse: boolean
+  level: 'critical' | 'warning' | 'normal' | 'safe'
+}

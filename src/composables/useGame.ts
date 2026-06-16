@@ -1,5 +1,5 @@
 import { ref, computed, watch } from 'vue'
-import type { GameState, LogEntry, RandomEvent, ActionType, ActionEffect } from '@/types/game'
+import type { GameState, LogEntry, RandomEvent, ActionType, ActionEffect, StatRisk, StatKey } from '@/types/game'
 import { randomEvents } from '@/data/events'
 
 const STORAGE_KEY_HIGH_SCORE = 'survival_game_high_score'
@@ -23,6 +23,78 @@ const actionNames: Record<ActionType, string> = {
   drink: '喝水',
 }
 
+const statMetadata: Record<StatKey, Omit<StatRisk, 'value' | 'risk' | 'level'>> = {
+  health: {
+    key: 'health',
+    label: '生命值',
+    max: 100,
+    icon: '❤️',
+    color: 'text-red-400',
+    barColor: 'bg-red-500',
+    isReverse: false,
+  },
+  hunger: {
+    key: 'hunger',
+    label: '饥饿值',
+    max: 100,
+    icon: '🍖',
+    color: 'text-orange-400',
+    barColor: 'bg-orange-500',
+    isReverse: true,
+  },
+  thirst: {
+    key: 'thirst',
+    label: '口渴值',
+    max: 100,
+    icon: '💧',
+    color: 'text-blue-400',
+    barColor: 'bg-blue-500',
+    isReverse: true,
+  },
+  wood: {
+    key: 'wood',
+    label: '木材',
+    max: 100,
+    icon: '🪵',
+    color: 'text-amber-600',
+    barColor: 'bg-amber-600',
+    isReverse: false,
+  },
+  stone: {
+    key: 'stone',
+    label: '石头',
+    max: 100,
+    icon: '🪨',
+    color: 'text-gray-400',
+    barColor: 'bg-gray-400',
+    isReverse: false,
+  },
+}
+
+function calculateRisk(value: number, max: number, isReverse: boolean): { risk: number; level: StatRisk['level'] } {
+  const percent = (value / max) * 100
+  let risk: number
+
+  if (isReverse) {
+    risk = percent
+  } else {
+    risk = 100 - percent
+  }
+
+  let level: StatRisk['level']
+  if (risk >= 80) {
+    level = 'critical'
+  } else if (risk >= 50) {
+    level = 'warning'
+  } else if (risk >= 20) {
+    level = 'normal'
+  } else {
+    level = 'safe'
+  }
+
+  return { risk, level }
+}
+
 export function useGame() {
   const state = ref<GameState>({
     health: 80,
@@ -39,6 +111,25 @@ export function useGame() {
   let logIdCounter = 0
 
   const canAct = computed(() => !state.value.isGameOver)
+
+  const statsByRisk = computed<StatRisk[]>(() => {
+    const stats: StatRisk[] = []
+    const keys: StatKey[] = ['health', 'hunger', 'thirst', 'wood', 'stone']
+
+    for (const key of keys) {
+      const meta = statMetadata[key]
+      const value = state.value[key]
+      const { risk, level } = calculateRisk(value, meta.max, meta.isReverse)
+      stats.push({
+        ...meta,
+        value,
+        risk,
+        level,
+      })
+    }
+
+    return stats.sort((a, b) => b.risk - a.risk)
+  })
 
   function loadHighScore() {
     try {
@@ -177,6 +268,7 @@ export function useGame() {
     state,
     highScore,
     canAct,
+    statsByRisk,
     canPerformAction,
     gatherWood,
     gatherStone,
